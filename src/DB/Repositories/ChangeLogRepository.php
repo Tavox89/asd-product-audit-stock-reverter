@@ -124,6 +124,29 @@ final class ChangeLogRepository {
 		return (bool) $wpdb->get_var( $wpdb->prepare( $sql, $source_system, $source_external_id ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 	}
 
+	public function mark_bridge_flag_by_event_hash( $event_hash ) {
+		global $wpdb;
+
+		$event_hash = sanitize_text_field( (string) $event_hash );
+		if ( '' === $event_hash ) {
+			return false;
+		}
+
+		$updated = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$this->table,
+			array(
+				'bridge_flag' => 1,
+			),
+			array(
+				'event_hash' => $event_hash,
+			),
+			array( '%d' ),
+			array( '%s' )
+		);
+
+		return false !== $updated;
+	}
+
 	private function build_where_sql( array $filters ) {
 		global $wpdb;
 

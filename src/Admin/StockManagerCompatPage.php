@@ -91,15 +91,24 @@ final class StockManagerCompatPage {
 	}
 
 	private function render_summary_cards( array $state, array $import_state ) {
-		$bridge_status = empty( $state['bridge_supported'] )
-			? 'Incompatible'
-			: ( ! empty( $state['bridge_disabled'] ) ? 'Deshabilitado' : 'Habilitado' );
+		$bridge_status = 'Incompatible';
+		$bridge_tone   = 'warning';
+
+		if ( ! empty( $state['bridge_supported'] ) && empty( $state['plugin_active'] ) ) {
+			$bridge_status = 'No disponible';
+		} elseif ( ! empty( $state['bridge_supported'] ) && ! empty( $state['bridge_disabled'] ) ) {
+			$bridge_status = 'Deshabilitado';
+			$bridge_tone   = 'warning';
+		} elseif ( ! empty( $state['bridge_supported'] ) ) {
+			$bridge_status = 'Habilitado';
+			$bridge_tone   = 'success';
+		}
 
 		echo '<div class="asdl-wcl-cards">';
 		$this->render_card( 'Plugin detectado', ! empty( $state['plugin_installed'] ) ? 'Sí' : 'No', ! empty( $state['plugin_installed'] ) ? 'success' : 'muted' );
 		$this->render_card( 'Activo', ! empty( $state['plugin_active'] ) ? 'Sí' : 'No', ! empty( $state['plugin_active'] ) ? 'success' : 'warning' );
 		$this->render_card( 'Modo actual', $this->format_mode_label( (string) ( $state['mode'] ?? 'native_only' ) ), 'info' );
-		$this->render_card( 'Bridge', $bridge_status, empty( $state['bridge_supported'] ) ? 'warning' : 'success' );
+		$this->render_card( 'Bridge', $bridge_status, $bridge_tone );
 		$this->render_card( 'Histórico detectado', (string) absint( $state['record_count'] ?? 0 ), 'neutral' );
 		$this->render_card( 'Importados en ASD', (string) absint( $state['imported_count'] ?? 0 ), 'neutral' );
 		$this->render_card( 'Pendientes', (string) absint( $import_state['remaining_count'] ?? max( 0, (int) ( $state['record_count'] ?? 0 ) - (int) ( $state['imported_count'] ?? 0 ) ) ), 'neutral' );
@@ -118,7 +127,7 @@ final class StockManagerCompatPage {
 		submit_button( 'Re-analizar compatibilidad', 'secondary', 'submit', false );
 		echo '</form>';
 
-		if ( ! empty( $state['import_supported'] ) && ( ! empty( $state['plugin_active'] ) || ! empty( $state['bridge_disabled'] ) ) ) {
+		if ( ! empty( $state['import_supported'] ) ) {
 			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 			echo '<input type="hidden" name="action" value="tvx_wcl_stock_manager_import" />';
 			echo '<input type="hidden" name="batch_size" value="250" />';
@@ -130,7 +139,7 @@ final class StockManagerCompatPage {
 			echo '</form>';
 		}
 
-		if ( ! empty( $state['import_supported'] ) ) {
+		if ( ! empty( $state['bridge_supported'] ) && ! empty( $state['plugin_active'] ) ) {
 			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 			echo '<input type="hidden" name="action" value="tvx_wcl_stock_manager_toggle_bridge" />';
 			echo '<input type="hidden" name="bridge_disabled" value="' . esc_attr( ! empty( $state['bridge_disabled'] ) ? '0' : '1' ) . '" />';
@@ -141,6 +150,13 @@ final class StockManagerCompatPage {
 		}
 
 		echo '</div>';
+
+		if ( ! empty( $state['import_supported'] ) && empty( $state['plugin_active'] ) ) {
+			echo '<p class="asdl-wcl-meta">Importación disponible; bridge no disponible porque Stock Manager no está activo.</p>';
+		} elseif ( ! empty( $state['import_supported'] ) && empty( $state['bridge_supported'] ) ) {
+			echo '<p class="asdl-wcl-meta">Importación disponible; bridge continuo deshabilitado porque el esquema no fue validado como seguro.</p>';
+		}
+
 		echo '</div>';
 	}
 

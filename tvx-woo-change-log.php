@@ -3,7 +3,7 @@
  * Plugin Name: ASD Labs Product Audit & Stock Reverter
  * Plugin URI: https://asdlabs.com.ve
  * Description: Auditoría enriquecida de productos WooCommerce, compatibilidad con Stock Manager y reversión arbitraria segura de inventario por pedido.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: ASD Labs
  * Author URI: https://asdlabs.com.ve
  * Text Domain: tvx-woo-change-log
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'TVX_WCL_VERSION' ) ) {
-	define( 'TVX_WCL_VERSION', '1.1.0' );
+	define( 'TVX_WCL_VERSION', '1.1.1' );
 }
 
 if ( ! defined( 'TVX_WCL_FILE' ) ) {

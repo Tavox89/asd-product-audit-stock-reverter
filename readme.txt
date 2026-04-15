@@ -18,12 +18,13 @@ Qué hace
 
 Cómo se instala
 ---------------
-1. Copia este plugin a `wp-content/plugins/tvx-woo-change-log`.
+1. Copia este plugin a tu directorio de plugins de WordPress.
 2. Actívalo desde WordPress.
 3. Verifica la creación/upgrade de tablas propias:
    - `{$wpdb->prefix}asdl_tvx_wc_change_log`
    - `{$wpdb->prefix}asdl_tvx_wc_reversions`
 4. Entra a `WooCommerce > Compatibilidad Stock Manager` para confirmar detección, modo y, si aplica, lanzar la importación histórica.
+5. Nota de compatibilidad: el slug técnico, el archivo principal y el text-domain internos siguen usando `tvx-woo-change-log` por compatibilidad retroactiva, aunque la marca visible del plugin sea ASD Labs.
 
 Cómo se prueba
 --------------
@@ -114,6 +115,7 @@ Decisiones de implementación
 - La auditoría enriquecida vive solo en tablas ASD Labs; la compatibilidad con Stock Manager es una capa aparte.
 - La importación histórica usa batches, checkpoint por opción, `source_system = stock_manager` y `source_context = stock_manager_legacy_import`.
 - El bridge continuo no intenta empujar `regular_price` ni `yith_cost` al historial externo porque ese esquema es claramente de stock.
+- El bridge continuo también se resuelve desde stock hooks nativos: si Stock Manager ya cubre ese mismo hook, se marca como puenteado sin duplicar inserciones torpes; si no lo cubre y el bridge es seguro, se inserta vía adapter.
 - La reversión arbitraria valida el resultado real del aumento de stock antes de limpiar `_reduced_stock`.
 
 Limitaciones conocidas

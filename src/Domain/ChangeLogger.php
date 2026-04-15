@@ -14,8 +14,17 @@ final class ChangeLogger {
 	}
 
 	public function log_change( array $product_snapshot, $field_key, $old_value, $new_value, array $context, array $options = array() ) {
+		$result = $this->log_change_entry( $product_snapshot, $field_key, $old_value, $new_value, $context, $options );
+
+		return ! empty( $result['logged'] );
+	}
+
+	public function log_change_entry( array $product_snapshot, $field_key, $old_value, $new_value, array $context, array $options = array() ) {
 		if ( empty( $product_snapshot ) ) {
-			return false;
+			return array(
+				'logged'     => false,
+				'event_hash' => '',
+			);
 		}
 
 		$field_key = sanitize_key( (string) $field_key );
@@ -23,7 +32,10 @@ final class ChangeLogger {
 		$new_value = $this->normalize_value( $new_value );
 
 		if ( $old_value === $new_value ) {
-			return false;
+			return array(
+				'logged'     => false,
+				'event_hash' => '',
+			);
 		}
 
 		$source_system      = sanitize_key( (string) ( $options['source_system'] ?? 'native' ) );
@@ -37,26 +49,14 @@ final class ChangeLogger {
 			$context_meta = $context['meta'];
 		}
 
-		$event_hash = hash(
-			'sha256',
-			wp_json_encode(
-				array(
-					'request_fingerprint' => (string) ( $context['request_fingerprint'] ?? '' ),
-					'product_id'          => (int) $product_snapshot['product_id'],
-					'variation_id'        => (int) $product_snapshot['variation_id'],
-					'field_key'           => $field_key,
-					'old_value'           => $old_value,
-					'new_value'           => $new_value,
-					'source_system'       => $source_system,
-					'source_external_id'  => $source_external_id,
-					'source_context'      => (string) ( $context['source_context'] ?? 'unknown' ),
-					'order_id'            => (int) ( $context_meta['order_id'] ?? 0 ),
-				)
-			)
-		);
+		$event_hash = $this->build_event_hash( $product_snapshot, $field_key, $old_value, $new_value, $context, $source_system, $source_external_id, $context_meta );
 
 		if ( isset( self::$seen_hashes[ $event_hash ] ) ) {
-			return false;
+			return array(
+				'logged'     => false,
+				'event_hash' => $event_hash,
+				'duplicate'  => true,
+			);
 		}
 
 		self::$seen_hashes[ $event_hash ] = true;
@@ -86,7 +86,17 @@ final class ChangeLogger {
 			'created_at_utc'      => '' !== $created_at_utc ? $created_at_utc : Time::now_utc(),
 		);
 
-		return $this->repository->insert( $row );
+		$inserted = $this->repository->insert( $row );
+
+		return array(
+			'logged'     => (bool) $inserted,
+			'event_hash' => $event_hash,
+			'duplicate'  => false,
+		);
+	}
+
+	public function mark_bridged( $event_hash ) {
+		return $this->repository->mark_bridge_flag_by_event_hash( $event_hash );
 	}
 
 	private function maybe_calculate_delta( $field_key, $old_value, $new_value ) {
@@ -113,5 +123,25 @@ final class ChangeLogger {
 		}
 
 		return sanitize_text_field( (string) $value );
+	}
+
+	private function build_event_hash( array $product_snapshot, $field_key, $old_value, $new_value, array $context, $source_system, $source_external_id, array $context_meta ) {
+		return hash(
+			'sha256',
+			wp_json_encode(
+				array(
+					'request_fingerprint' => (string) ( $context['request_fingerprint'] ?? '' ),
+					'product_id'          => (int) $product_snapshot['product_id'],
+					'variation_id'        => (int) $product_snapshot['variation_id'],
+					'field_key'           => $field_key,
+					'old_value'           => $old_value,
+					'new_value'           => $new_value,
+					'source_system'       => $source_system,
+					'source_external_id'  => $source_external_id,
+					'source_context'      => (string) ( $context['source_context'] ?? 'unknown' ),
+					'order_id'            => (int) ( $context_meta['order_id'] ?? 0 ),
+				)
+			)
+		);
 	}
 }

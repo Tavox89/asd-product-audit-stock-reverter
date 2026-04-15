@@ -120,7 +120,7 @@ final class ChangeDetector {
 		$old_value = $pending['old_value'] ?? null;
 		$new_value = is_object( $product ) && method_exists( $product, 'get_stock_quantity' ) ? $product->get_stock_quantity( 'edit' ) : null;
 
-		$this->logger->log_change( $product_snapshot, 'stock', $old_value, $new_value, $context );
+		$this->log_stock_change( $product_snapshot, $old_value, $new_value, $context );
 	}
 
 	private function finalize_change( $object_id, $meta_key, $meta_value ) {
@@ -141,11 +141,12 @@ final class ChangeDetector {
 		$old_value = $pending['old_value'] ?? '';
 		$field_key = $pending['field_key'] ?? $this->field_key_for_meta_key( $meta_key );
 
-		$logged = $this->logger->log_change( $product_snapshot, $field_key, $old_value, $meta_value, $context );
-
-		if ( $logged && 'stock' === $field_key ) {
-			$this->bridge_writer->maybe_write_stock_event( $product_snapshot, $meta_value, $context );
+		if ( 'stock' === $field_key ) {
+			$this->log_stock_change( $product_snapshot, $old_value, $meta_value, $context );
+			return;
 		}
+
+		$this->logger->log_change( $product_snapshot, $field_key, $old_value, $meta_value, $context );
 	}
 
 	private function push_pending( $object_id, $meta_key, array $payload ) {
@@ -262,5 +263,17 @@ final class ChangeDetector {
 		$context['meta']['detector'] = sanitize_key( (string) $detector );
 
 		return $context;
+	}
+
+	private function log_stock_change( array $product_snapshot, $old_value, $new_value, array $context ) {
+		$result = $this->logger->log_change_entry( $product_snapshot, 'stock', $old_value, $new_value, $context );
+		if ( empty( $result['logged'] ) || empty( $result['event_hash'] ) ) {
+			return;
+		}
+
+		$bridge_result = $this->bridge_writer->maybe_write_stock_event( $product_snapshot, $new_value, $context );
+		if ( ! empty( $bridge_result['bridge_flag'] ) ) {
+			$this->logger->mark_bridged( (string) $result['event_hash'] );
+		}
 	}
 }
