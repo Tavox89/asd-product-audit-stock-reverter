@@ -5,6 +5,8 @@ namespace ASDLabs\TVXWooChangeLog\Core;
 use ASDLabs\TVXWooChangeLog\Admin\Menu;
 use ASDLabs\TVXWooChangeLog\Core\Contracts\Module;
 use ASDLabs\TVXWooChangeLog\Integrations\WooCommerce\Module as WooModule;
+use ASDLabs\TVXWooChangeLog\StockManagerCompat\Detector as StockManagerDetector;
+use ASDLabs\TVXWooChangeLog\StockManagerCompat\Module as StockManagerCompatModule;
 
 final class Plugin {
 	private static $instance = null;
@@ -21,6 +23,7 @@ final class Plugin {
 	public static function activate() {
 		SchemaInstaller::activate();
 		CapabilityManager::activate();
+		( new StockManagerDetector() )->refresh_cache();
 	}
 
 	public static function deactivate() {
@@ -33,6 +36,7 @@ final class Plugin {
 		$this->modules = array(
 			new SchemaInstaller(),
 			new CapabilityManager(),
+			new StockManagerCompatModule(),
 			new Menu(),
 			new WooModule(),
 		);
@@ -54,6 +58,6 @@ final class Plugin {
 			return;
 		}
 
-		echo '<div class="notice notice-error"><p><strong>TVX Woo Change Log:</strong> requiere WooCommerce activo para operar.</p></div>';
+		echo '<div class="notice notice-error"><p><strong>ASD Labs Product Audit &amp; Stock Reverter:</strong> requiere WooCommerce activo para operar.</p></div>';
 	}
 }

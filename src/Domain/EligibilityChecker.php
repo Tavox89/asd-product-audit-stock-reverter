@@ -11,9 +11,9 @@ final class EligibilityChecker {
 	private $reversion_repository;
 
 	public function __construct( NotePatternMatcher $note_matcher, InvoiceMetaResolver $invoice_meta_resolver, ReversionRepository $reversion_repository ) {
-		$this->note_matcher         = $note_matcher;
+		$this->note_matcher          = $note_matcher;
 		$this->invoice_meta_resolver = $invoice_meta_resolver;
-		$this->reversion_repository = $reversion_repository;
+		$this->reversion_repository  = $reversion_repository;
 	}
 
 	public function build_preview( $order ) {
@@ -28,11 +28,16 @@ final class EligibilityChecker {
 		$order_id               = (int) $order->get_id();
 		$matched_notes          = $this->note_matcher->find_matching_notes( $order );
 		$items                  = $this->collect_item_preview( $order );
-		$has_reduced_item_meta  = $this->items_have_positive_reduced_stock( $items );
-		$has_restorable_items   = $this->items_have_restorable_stock( $items );
+		$positive_reduced_count = $this->count_positive_reduced_items( $items );
+		$restorable_items       = $this->filter_items_by_key( $items, 'can_restore', true );
+		$skipped_items          = $this->filter_items_by_key( $items, 'can_restore', false );
+		$has_reduced_item_meta  = $positive_reduced_count > 0;
+		$has_restorable_items   = ! empty( $restorable_items );
 		$order_stock_reduced    = $this->order_has_stock_reduced_flag( $order );
 		$already_reverted_meta  = sanitize_text_field( (string) $order->get_meta( '_tvx_wcl_arbitrary_reverted_at_utc', true ) );
+		$partial_reverted_meta  = sanitize_text_field( (string) $order->get_meta( '_tvx_wcl_arbitrary_revert_partial_at_utc', true ) );
 		$reversion_record       = $this->reversion_repository->find_latest_successful_by_order_id( $order_id );
+		$latest_record          = $this->reversion_repository->find_latest_by_order_id( $order_id );
 		$already_reverted       = '' !== $already_reverted_meta || ! empty( $reversion_record );
 		$blocking_reasons       = array();
 
@@ -60,10 +65,27 @@ final class EligibilityChecker {
 			'customer_label'      => $this->build_customer_label( $order ),
 			'matched_notes'       => $matched_notes,
 			'items'               => $items,
+			'restorable_items'    => $restorable_items,
+			'skipped_items'       => $skipped_items,
 			'order_stock_reduced' => $order_stock_reduced,
 			'already_reverted'    => $already_reverted,
+			'partial_reverted'    => '' !== $partial_reverted_meta,
 			'has_reduced_item_meta' => $has_reduced_item_meta,
 			'has_restorable_items'  => $has_restorable_items,
+			'note_evidence'       => array(
+				'has_matching_note' => ! empty( $matched_notes ),
+				'count'             => count( $matched_notes ),
+				'notes'             => $matched_notes,
+			),
+			'line_evidence'       => array(
+				'has_reduced_item_meta' => $has_reduced_item_meta,
+				'positive_reduced_count'=> $positive_reduced_count,
+				'restorable_count'      => count( $restorable_items ),
+			),
+			'order_flag_evidence' => array(
+				'stock_reduced' => $order_stock_reduced,
+			),
+			'last_reversion'      => $latest_record,
 			'eligible'            => empty( $blocking_reasons ),
 			'blocking_reasons'    => $blocking_reasons,
 		);
@@ -86,6 +108,7 @@ final class EligibilityChecker {
 			$managing     = $product && method_exists( $product, 'managing_stock' ) ? (bool) $product->managing_stock() : false;
 			$exists       = (bool) $product;
 			$skip_reason  = '';
+			$current_stock = $product && method_exists( $product, 'get_stock_quantity' ) ? $product->get_stock_quantity( 'edit' ) : null;
 
 			if ( $reduced_qty <= 0 ) {
 				$skip_reason = 'Sin _reduced_stock positivo';
@@ -103,6 +126,9 @@ final class EligibilityChecker {
 				'sku'                => sanitize_text_field( $sku ),
 				'ordered_qty'        => (float) $item->get_quantity(),
 				'reduced_stock_qty'  => $reduced_qty,
+				'current_stock_qty'  => is_numeric( $current_stock ) ? (float) $current_stock : null,
+				'product_exists'     => $exists,
+				'manage_stock'       => $managing,
 				'has_op_reduced_stock' => '' !== (string) $item->get_meta( '_op_reduced_stock', true ),
 				'can_restore'        => '' === $skip_reason,
 				'skip_reason'        => $skip_reason,
@@ -112,24 +138,28 @@ final class EligibilityChecker {
 		return $items;
 	}
 
-	private function items_have_positive_reduced_stock( array $items ) {
+	private function count_positive_reduced_items( array $items ) {
+		$count = 0;
+
 		foreach ( $items as $item ) {
 			if ( (float) ( $item['reduced_stock_qty'] ?? 0 ) > 0 ) {
-				return true;
+				$count++;
 			}
 		}
 
-		return false;
+		return $count;
 	}
 
-	private function items_have_restorable_stock( array $items ) {
+	private function filter_items_by_key( array $items, $key, $expected ) {
+		$filtered = array();
+
 		foreach ( $items as $item ) {
-			if ( ! empty( $item['can_restore'] ) ) {
-				return true;
+			if ( ( $item[ $key ] ?? null ) === $expected ) {
+				$filtered[] = $item;
 			}
 		}
 
-		return false;
+		return $filtered;
 	}
 
 	private function order_has_stock_reduced_flag( $order ) {

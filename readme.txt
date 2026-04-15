@@ -1,54 +1,64 @@
-TVX Woo Change Log & Safe Inventory Reverter
-===========================================
+ASD Labs Product Audit & Stock Reverter
+======================================
 
 Qué hace
 ---------
-- Registra cambios reales de `stock`, `regular_price` y `yith_cost` cuando exista una meta YITH verificada en runtime.
-- Guarda el log en tabla propia con contexto, actor, origen, fingerprint y fecha UTC.
-- Añade una página admin paginada dentro de WooCommerce.
-- Permite buscar pedidos/facturas en cualquier estado y ejecutar una reversión arbitraria y segura de inventario sin tocar el estado del pedido.
-- Audita cada reversión en una tabla propia y deja una sola nota interna final en el pedido.
+- Mantiene una auditoría canónica en tablas propias para `stock`, `regular_price`, `yith_cost` y eventos de `arbitrary_revert`.
+- Registra actor, usuario, before/after, delta, source/context, metadata útil, source system e indicadores de import/bridge.
+- Añade compatibilidad por capas con Stock Manager for WooCommerce:
+  - `native_only`
+  - `stock_manager_import_only`
+  - `stock_manager_bridge`
+- Importa historial legado del stock log de Stock Manager en lotes y sin destruir datos.
+- Endurece la reversión arbitraria por pedido con lock, idempotencia, estado `success|partial|blocked`, una sola nota final y sin cambiar el estado del pedido.
+- Añade tres vistas admin bajo WooCommerce:
+  - `ASD Labs Audit Log`
+  - `Revertir inventario`
+  - `Compatibilidad Stock Manager`
 
 Cómo se instala
 ---------------
 1. Copia este plugin a `wp-content/plugins/tvx-woo-change-log`.
-2. Activa el plugin desde WordPress.
-3. Verifica que se hayan creado las tablas:
+2. Actívalo desde WordPress.
+3. Verifica la creación/upgrade de tablas propias:
    - `{$wpdb->prefix}asdl_tvx_wc_change_log`
    - `{$wpdb->prefix}asdl_tvx_wc_reversions`
-4. Revisa el menú WooCommerce:
-   - `TVX Change Log`
-   - `Revertir inventario`
+4. Entra a `WooCommerce > Compatibilidad Stock Manager` para confirmar detección, modo y, si aplica, lanzar la importación histórica.
 
 Cómo se prueba
 --------------
-1. Edita un producto simple o una variación y cambia stock o regular price.
-2. Revisa que aparezca la entrada en `WooCommerce > TVX Change Log`.
-3. Busca un pedido con `_reduced_stock` en sus líneas y con nota de evidencia de descuento de inventario.
-4. Abre `WooCommerce > Revertir inventario`, busca el pedido, revisa el preview y ejecuta la reversión.
-5. Confirma:
+1. Cambia stock desde edición normal, quick edit, bulk edit o una ruta que termine en `wc_update_product_stock()`.
+2. Revisa `WooCommerce > ASD Labs Audit Log`.
+3. Si Stock Manager está presente, valida su detección y ejecuta un lote de importación desde `WooCommerce > Compatibilidad Stock Manager`.
+4. Busca un pedido con nota de descuento de inventario y `_reduced_stock` positivo en sus líneas.
+5. Abre `WooCommerce > Revertir inventario`, revisa el preview y ejecuta la reversión.
+6. Confirma:
    - el estado del pedido no cambió
-   - el stock del producto sí aumentó
-   - `_reduced_stock` quedó limpiado en las líneas restauradas
-   - `_order_stock_reduced` quedó desmarcado
-   - el pedido recibió una sola nota final de reversión
-   - se creó una fila de auditoría en `asdl_tvx_wc_reversions`
+   - solo se restauró stock donde `_reduced_stock > 0`
+   - en una reversión parcial no se limpió el flag global ni se marcó como éxito total
+   - en una reversión completa se limpió `_order_stock_reduced`
+   - el pedido recibió una sola nota final
+   - se registró auditoría en `asdl_tvx_wc_reversions`
 
 Meta YITH detectada
 -------------------
-- En la inspección local no se encontró instalado un plugin YITH Cost of Goods verificable.
+- En la inspección local no se encontró un plugin YITH Cost of Goods verificable.
 - Por rigor, el plugin no activa ninguna meta YITH por defecto.
-- Referencias históricas observadas localmente, pero no habilitadas por no estar verificadas: `yith_cog_cost`, `_yith_cog_cost`.
+- Queda disponible configuración por filtro:
+  - `asdl_tvx_wc_yith_cost_meta_keys`
+  - `tvx_wcl_yith_cost_meta_keys`
+- Referencias observadas localmente pero no habilitadas automáticamente:
+  - `yith_cog_cost`
+  - `_yith_cog_cost`
 - Costos no-YITH observados localmente:
   - `_wc_cog_cost`
   - `_wc_cog_cost_variable`
   - `_op_cost_price`
-- Si más adelante necesitas activar una meta YITH verificada, usa el filtro `tvx_wcl_yith_cost_meta_keys`.
 
 Estrategia de invoice search usada
 ----------------------------------
-- Se detectaron integraciones locales de numeración secuencial y OpenPOS.
-- La búsqueda soporta, en este orden operativo, estas metas:
+- La búsqueda prioriza order ID y order number nativo de WooCommerce.
+- Se encapsularon metas observadas localmente para OpenPOS y numeración operativa:
   - `_invoice_number`
   - `_order_number`
   - `_order_number_formatted`
@@ -62,30 +72,53 @@ Estrategia de invoice search usada
   - `_op_receipt_number`
   - `_wpos_order_number`
   - `_billing_document`
-- También soporta búsqueda directa por order ID.
-- No se encontró una meta específica de número de factura expuesta por WPO/WCPDF dentro de este árbol local.
+- La UI usa la URL oficial de edición del pedido cuando WooCommerce la expone.
+
+Compatibilidad Stock Manager
+----------------------------
+- Plugin local detectado en la inspección: `Stock Manager for WooCommerce`.
+- Tabla histórica detectada localmente: `{$wpdb->prefix}stock_log`.
+- Columnas clave detectadas: `ID`, `date_created`, `product_id`, `qty`.
+- Hooks relevantes observados en su código local:
+  - `woocommerce_product_set_stock`
+  - `woocommerce_variation_set_stock`
+  - callback `save_stock`
+- Estrategia implementada:
+  - ASD Labs sigue siendo la fuente canónica enriquecida.
+  - El historial legado puede importarse por lotes a la tabla ASD.
+  - El bridge continuo se limita a stock y solo se intenta cuando el esquema fue validado.
+  - No se alteran ni borran tablas del plugin tercero.
 
 Hooks y puntos de captura usados
 --------------------------------
-- `update_post_metadata`
-- `add_post_metadata`
-- `updated_post_meta`
-- `added_post_meta`
-- `woocommerce_can_reduce_order_stock`
-- `woocommerce_can_restore_order_stock`
-- `woocommerce_reduce_order_stock`
-- `woocommerce_restore_order_stock`
+- Logging de stock real:
+  - `woocommerce_product_before_set_stock`
+  - `woocommerce_variation_before_set_stock`
+  - `woocommerce_product_set_stock`
+  - `woocommerce_variation_set_stock`
+- Fallback por meta:
+  - `update_post_metadata`
+  - `add_post_metadata`
+  - `updated_post_meta`
+  - `added_post_meta`
+- Contexto de pedidos:
+  - `woocommerce_can_reduce_order_stock`
+  - `woocommerce_can_restore_order_stock`
+  - `woocommerce_reduce_order_stock`
+  - `woocommerce_restore_order_stock`
 
 Decisiones de implementación
 ----------------------------
-- El change log usa hooks de meta relevantes y contexto por request/backtrace para cubrir edición normal, quick edit, bulk edit, REST, import, stock manager, reducción por pedido y reversión manual.
-- La reversión arbitraria no usa helpers core que puedan añadir notas extra; restaura stock con `wc_update_product_stock()` y luego limpia flags/metas de forma controlada.
-- Se eliminan `_reduced_stock` y, cuando existe, `_op_reduced_stock` por ítem restaurado.
-- Para compatibilidad local con tu backup, si el pedido tiene `_csfx_lb_stock_reduced_sync`, se marca `_csfx_lb_stock_reverted`.
-- La idempotencia se apoya en lock por pedido + meta interna `_tvx_wcl_arbitrary_reverted_at_utc` + auditoría persistente.
+- Se preservó la arquitectura modular existente; no se rehizo el plugin desde cero.
+- Se mantuvo namespace/prefijo interno actual por bajo riesgo, pero el branding visible pasó a ASD Labs.
+- La auditoría enriquecida vive solo en tablas ASD Labs; la compatibilidad con Stock Manager es una capa aparte.
+- La importación histórica usa batches, checkpoint por opción, `source_system = stock_manager` y `source_context = stock_manager_legacy_import`.
+- El bridge continuo no intenta empujar `regular_price` ni `yith_cost` al historial externo porque ese esquema es claramente de stock.
+- La reversión arbitraria valida el resultado real del aumento de stock antes de limpiar `_reduced_stock`.
 
 Limitaciones conocidas
 ----------------------
-- CSV export no está implementado en esta primera versión para no contaminar el core.
-- Sin una meta YITH verificada localmente, `yith_cost` queda visible como campo lógico pero no generará cambios hasta que se configure el filtro correspondiente.
-- La detección de contexto `manual_edit`, `quick_edit`, `bulk_edit`, `stock_manager`, `rest_api` e `import` es robusta pero heurística por request/backtrace, no por un API unificado de WooCommerce.
+- No hay CSV export en esta iteración.
+- Si una operación externa modifica `_stock` solo por meta y además genera su propio historial paralelo no observable, el bridge evita duplicación torpe por ruta/contexto, pero no puede demostrar equivalencia perfecta de sistemas ajenos sin claves de correlación externas.
+- Sin una meta YITH verificada, `yith_cost` sigue degradado de forma elegante.
+- La validación por notas de pedido sigue siendo configurable por patrones y depende del workflow local de notas.

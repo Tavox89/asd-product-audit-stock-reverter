@@ -4,7 +4,8 @@ namespace ASDLabs\TVXWooChangeLog\Integrations\YITH;
 
 final class CostMetaResolver {
 	public function get_monitored_meta_keys() {
-		$keys = apply_filters( 'tvx_wcl_yith_cost_meta_keys', array() );
+		$keys = apply_filters( 'asdl_tvx_wc_yith_cost_meta_keys', array() );
+		$keys = apply_filters( 'tvx_wcl_yith_cost_meta_keys', $keys );
 		if ( ! is_array( $keys ) ) {
 			return array();
 		}
@@ -18,10 +19,10 @@ final class CostMetaResolver {
 
 	public function get_status_label() {
 		if ( $this->is_available() ) {
-			return 'YITH Cost of Goods detectado por configuración/hook en runtime.';
+			return 'YITH Cost of Goods habilitado mediante meta keys verificadas/configuradas en runtime.';
 		}
 
-		return 'YITH Cost of Goods no fue localizado en la inspección local. El módulo queda degradado sin romper stock ni regular price.';
+		return 'YITH Cost of Goods no fue localizado en la inspección local. ASD Labs Product Audit & Stock Reverter sigue auditando stock y regular price sin romper la UI.';
 	}
 
 	public function get_locally_observed_notes() {

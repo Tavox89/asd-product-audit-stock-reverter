@@ -70,6 +70,60 @@ final class ChangeLogRepository {
 		return is_array( $rows ) ? $rows : array();
 	}
 
+	public function count_by_source_system( $source_system, $imported_only = null ) {
+		global $wpdb;
+
+		$source_system = sanitize_key( (string) $source_system );
+		if ( '' === $source_system ) {
+			return 0;
+		}
+
+		$sql    = "SELECT COUNT(*) FROM {$this->table} WHERE source_system = %s";
+		$params = array( $source_system );
+
+		if ( null !== $imported_only ) {
+			$sql      .= ' AND import_flag = %d';
+			$params[] = $imported_only ? 1 : 0;
+		}
+
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $params ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	}
+
+	public function find_latest_by_source_system( $source_system ) {
+		global $wpdb;
+
+		$source_system = sanitize_key( (string) $source_system );
+		if ( '' === $source_system ) {
+			return array();
+		}
+
+		$sql = "SELECT * FROM {$this->table}
+			WHERE source_system = %s
+			ORDER BY created_at_utc DESC, id DESC
+			LIMIT 1";
+
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $source_system ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		return is_array( $row ) ? $row : array();
+	}
+
+	public function has_source_reference( $source_system, $source_external_id ) {
+		global $wpdb;
+
+		$source_system      = sanitize_key( (string) $source_system );
+		$source_external_id = sanitize_text_field( (string) $source_external_id );
+
+		if ( '' === $source_system || '' === $source_external_id ) {
+			return false;
+		}
+
+		$sql = "SELECT id FROM {$this->table}
+			WHERE source_system = %s AND source_external_id = %s
+			LIMIT 1";
+
+		return (bool) $wpdb->get_var( $wpdb->prepare( $sql, $source_system, $source_external_id ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	}
+
 	private function build_where_sql( array $filters ) {
 		global $wpdb;
 

@@ -6,7 +6,7 @@ use ASDLabs\TVXWooChangeLog\Core\Contracts\Module;
 
 final class CapabilityManager implements Module {
 	const OPTION_VERSION       = 'tvx_wcl_capabilities_version';
-	const VERSION              = '2026.04.14-alpha1';
+	const VERSION              = '2026.04.14-beta2';
 	const VIEW_CHANGE_LOG      = 'asdl_tvx_wc_view_change_log';
 	const REVERT_INVENTORY     = 'asdl_tvx_wc_revert_inventory';
 	const MANAGE_CONFIGURATION = 'asdl_tvx_wc_manage_change_log';
@@ -60,5 +60,9 @@ final class CapabilityManager implements Module {
 
 	public static function current_user_can_revert_inventory() {
 		return current_user_can( self::REVERT_INVENTORY );
+	}
+
+	public static function current_user_can_manage_configuration() {
+		return current_user_can( self::MANAGE_CONFIGURATION );
 	}
 }

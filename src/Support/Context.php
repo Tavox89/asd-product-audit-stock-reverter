@@ -71,8 +71,11 @@ final class Context {
 			$source = 'manual_edit';
 		}
 
-		$actor_type = 'system';
-		if ( in_array( $source, array( 'order_reduce', 'order_restore' ), true ) ) {
+		$runtime_actor_type = sanitize_key( (string) ( $runtime['actor_type'] ?? '' ) );
+		$actor_type         = 'system';
+		if ( '' !== $runtime_actor_type ) {
+			$actor_type = $runtime_actor_type;
+		} elseif ( in_array( $source, array( 'order_reduce', 'order_restore' ), true ) ) {
 			$actor_type = 'order';
 		} elseif ( 'rest_api' === $source ) {
 			$actor_type = 'api';

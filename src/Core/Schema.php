@@ -3,7 +3,7 @@
 namespace ASDLabs\TVXWooChangeLog\Core;
 
 final class Schema {
-	const VERSION = '2026.04.14-alpha1';
+	const VERSION = '2026.04.14-beta2';
 
 	public static function get_queries() {
 		global $wpdb;
@@ -29,6 +29,10 @@ final class Schema {
 				changed_by_user_id bigint(20) unsigned DEFAULT NULL,
 				changed_by_name varchar(191) DEFAULT '',
 				actor_type varchar(20) DEFAULT 'system',
+				source_system varchar(40) DEFAULT 'native',
+				source_external_id varchar(191) DEFAULT '',
+				import_flag tinyint(1) unsigned NOT NULL DEFAULT 0,
+				bridge_flag tinyint(1) unsigned NOT NULL DEFAULT 0,
 				source_context varchar(40) DEFAULT 'unknown',
 				request_fingerprint char(64) DEFAULT '',
 				context_json longtext NULL,
@@ -39,6 +43,8 @@ final class Schema {
 				KEY variation_id (variation_id),
 				KEY field_key (field_key),
 				KEY changed_by_user_id (changed_by_user_id),
+				KEY source_system (source_system),
+				KEY import_flag (import_flag),
 				KEY created_at_utc (created_at_utc),
 				KEY request_fingerprint (request_fingerprint)
 			) {$charset_collate};",
@@ -55,6 +61,7 @@ final class Schema {
 				result_status varchar(40) DEFAULT 'success',
 				items_restored_json longtext NULL,
 				items_skipped_json longtext NULL,
+				items_failed_json longtext NULL,
 				context_json longtext NULL,
 				PRIMARY KEY  (id),
 				KEY order_id (order_id),

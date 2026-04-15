@@ -56,7 +56,7 @@ final class OrderSearchService {
 				'invoice_number' => sanitize_text_field( (string) $this->invoice_meta_resolver->resolve_invoice_number( $order ) ),
 				'status'         => sanitize_text_field( (string) $order->get_status() ),
 				'customer'       => sanitize_text_field( trim( $order->get_formatted_billing_full_name() ) ),
-				'edit_url'       => admin_url( 'post.php?post=' . (int) $order->get_id() . '&action=edit' ),
+				'edit_url'       => esc_url_raw( (string) $this->invoice_meta_resolver->resolve_order_edit_url( $order ) ),
 			);
 		}
 

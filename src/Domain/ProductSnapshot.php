@@ -47,4 +47,36 @@ final class ProductSnapshot {
 			'product_name' => sanitize_text_field( $name ),
 		);
 	}
+
+	public static function from_product( $product ) {
+		if ( ! $product || ! is_object( $product ) || ! method_exists( $product, 'get_id' ) ) {
+			return array();
+		}
+
+		return self::from_post_id( (int) $product->get_id() );
+	}
+
+	public static function fallback( $product_id, array $args = array() ) {
+		$product_id   = absint( $product_id );
+		$variation_id = absint( $args['variation_id'] ?? 0 );
+		$parent_id    = absint( $args['parent_id'] ?? 0 );
+		$product_type = sanitize_key( (string) ( $args['product_type'] ?? ( $variation_id > 0 ? 'variation' : 'product' ) ) );
+		$sku          = sanitize_text_field( (string) ( $args['sku'] ?? '' ) );
+		$product_name = sanitize_text_field( (string) ( $args['product_name'] ?? '' ) );
+
+		if ( '' === $product_name ) {
+			$product_name = $variation_id > 0
+				? 'Legacy variation #' . $variation_id
+				: 'Legacy product #' . $product_id;
+		}
+
+		return array(
+			'product_id'   => $product_id,
+			'variation_id' => $variation_id,
+			'parent_id'    => $parent_id,
+			'product_type' => $product_type,
+			'sku'          => $sku,
+			'product_name' => $product_name,
+		);
+	}
 }

@@ -13,7 +13,7 @@ final class ChangeLogger {
 		$this->repository = $repository;
 	}
 
-	public function log_change( array $product_snapshot, $field_key, $old_value, $new_value, array $context ) {
+	public function log_change( array $product_snapshot, $field_key, $old_value, $new_value, array $context, array $options = array() ) {
 		if ( empty( $product_snapshot ) ) {
 			return false;
 		}
@@ -25,6 +25,12 @@ final class ChangeLogger {
 		if ( $old_value === $new_value ) {
 			return false;
 		}
+
+		$source_system      = sanitize_key( (string) ( $options['source_system'] ?? 'native' ) );
+		$source_external_id = sanitize_text_field( (string) ( $options['source_external_id'] ?? '' ) );
+		$import_flag        = ! empty( $options['import_flag'] ) ? 1 : 0;
+		$bridge_flag        = ! empty( $options['bridge_flag'] ) ? 1 : 0;
+		$created_at_utc     = sanitize_text_field( (string) ( $options['created_at_utc'] ?? '' ) );
 
 		$context_meta = array();
 		if ( ! empty( $context['meta'] ) && is_array( $context['meta'] ) ) {
@@ -41,6 +47,8 @@ final class ChangeLogger {
 					'field_key'           => $field_key,
 					'old_value'           => $old_value,
 					'new_value'           => $new_value,
+					'source_system'       => $source_system,
+					'source_external_id'  => $source_external_id,
 					'source_context'      => (string) ( $context['source_context'] ?? 'unknown' ),
 					'order_id'            => (int) ( $context_meta['order_id'] ?? 0 ),
 				)
@@ -68,10 +76,14 @@ final class ChangeLogger {
 			'changed_by_user_id'  => ! empty( $context['user_id'] ) ? absint( $context['user_id'] ) : null,
 			'changed_by_name'     => sanitize_text_field( (string) ( $context['user_display_name'] ?? '' ) ),
 			'actor_type'          => sanitize_key( (string) ( $context['actor_type'] ?? 'system' ) ),
+			'source_system'       => $source_system,
+			'source_external_id'  => $source_external_id,
+			'import_flag'         => $import_flag,
+			'bridge_flag'         => $bridge_flag,
 			'source_context'      => sanitize_key( (string) ( $context['source_context'] ?? 'unknown' ) ),
 			'request_fingerprint' => sanitize_text_field( (string) ( $context['request_fingerprint'] ?? '' ) ),
 			'context_json'        => ! empty( $context_meta ) ? wp_json_encode( $context_meta ) : null,
-			'created_at_utc'      => Time::now_utc(),
+			'created_at_utc'      => '' !== $created_at_utc ? $created_at_utc : Time::now_utc(),
 		);
 
 		return $this->repository->insert( $row );

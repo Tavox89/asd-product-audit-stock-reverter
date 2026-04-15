@@ -3,6 +3,7 @@
 namespace ASDLabs\TVXWooChangeLog\Core;
 
 use ASDLabs\TVXWooChangeLog\Core\Contracts\Module;
+use ASDLabs\TVXWooChangeLog\StockManagerCompat\Detector as StockManagerDetector;
 
 final class SchemaInstaller implements Module {
 	const OPTION_SCHEMA_VERSION = 'tvx_wcl_schema_version';
@@ -31,5 +32,9 @@ final class SchemaInstaller implements Module {
 		}
 
 		update_option( self::OPTION_SCHEMA_VERSION, Schema::VERSION, false );
+
+		if ( class_exists( '\ASDLabs\TVXWooChangeLog\StockManagerCompat\Detector' ) ) {
+			( new StockManagerDetector() )->refresh_cache();
+		}
 	}
 }

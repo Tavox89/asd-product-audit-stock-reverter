@@ -13,6 +13,9 @@ $autoloader->register();
 
 delete_option( \ASDLabs\TVXWooChangeLog\Core\CapabilityManager::OPTION_VERSION );
 delete_option( \ASDLabs\TVXWooChangeLog\Core\SchemaInstaller::OPTION_SCHEMA_VERSION );
+delete_option( \ASDLabs\TVXWooChangeLog\StockManagerCompat\Detector::OPTION_STATE );
+delete_option( \ASDLabs\TVXWooChangeLog\StockManagerCompat\Detector::OPTION_IMPORT_STATE );
+delete_option( \ASDLabs\TVXWooChangeLog\StockManagerCompat\Detector::OPTION_BRIDGE_DISABLED );
 
 if ( defined( 'TVX_WCL_REMOVE_DATA_ON_UNINSTALL' ) && TVX_WCL_REMOVE_DATA_ON_UNINSTALL ) {
 	global $wpdb;

@@ -49,9 +49,9 @@ final class RevertInventoryPage {
 			}
 		}
 
-		echo '<div class="wrap">';
-		echo '<h1>Revertir inventario</h1>';
-		echo '<p>Busca por ID de pedido, order number o invoice number según las metas detectadas localmente. La acción no cambia el estado del pedido ni sus totales.</p>';
+		echo '<div class="wrap asdl-wcl-admin">';
+		echo '<h1>ASD Labs · Revertir inventario</h1>';
+		echo '<p>Busca por pedido o factura en cualquier estado. La operación solo intenta restaurar el stock realmente descontado, no cambia estado, totales ni datos comerciales del pedido.</p>';
 
 		$this->render_notice();
 		$this->render_strategy_notes();
@@ -85,7 +85,13 @@ final class RevertInventoryPage {
 
 		$this->redirect_with_notice(
 			'success',
-			sprintf( 'Reversión aplicada correctamente. Ítems restaurados: %d.', count( (array) ( $result['restored'] ?? array() ) ) ),
+			sprintf(
+				'Reversión %1$s. Ítems restaurados: %2$d. Omitidos: %3$d. Fallidos: %4$d.',
+				'partial' === ( $result['status'] ?? '' ) ? 'parcial aplicada' : 'aplicada correctamente',
+				count( (array) ( $result['restored'] ?? array() ) ),
+				count( (array) ( $result['skipped'] ?? array() ) ),
+				count( (array) ( $result['failed'] ?? array() ) )
+			),
 			$order_id,
 			$query
 		);
@@ -110,18 +116,26 @@ final class RevertInventoryPage {
 	}
 
 	private function render_strategy_notes() {
-		echo '<div class="notice notice-info"><p><strong>Estrategia de búsqueda local:</strong> ';
-		echo esc_html( implode( ' | ', $this->invoice_meta_resolver->get_detected_strategy_notes() ) );
-		echo '</p></div>';
+		echo '<div class="asdl-wcl-panel">';
+		echo '<h2>Estrategia de búsqueda</h2>';
+		echo '<ul class="asdl-wcl-list">';
+		foreach ( $this->invoice_meta_resolver->get_detected_strategy_notes() as $note ) {
+			echo '<li>' . esc_html( (string) $note ) . '</li>';
+		}
+		echo '</ul>';
+		echo '</div>';
 	}
 
 	private function render_search_form( $query ) {
-		echo '<form method="get" style="margin:16px 0 20px;">';
+		echo '<div class="asdl-wcl-panel">';
+		echo '<h2>Buscar pedido o factura</h2>';
+		echo '<form method="get">';
 		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
 		echo '<label for="tvx-wcl-order-query"><strong>Pedido / factura</strong></label><br />';
 		echo '<input type="text" id="tvx-wcl-order-query" name="order_query" value="' . esc_attr( $query ) . '" class="regular-text" placeholder="Ej: 1234, FACT-001, 000045" /> ';
 		submit_button( 'Buscar', 'primary', '', false );
 		echo '</form>';
+		echo '</div>';
 	}
 
 	private function render_search_results( array $results, $query ) {
@@ -132,8 +146,7 @@ final class RevertInventoryPage {
 			return;
 		}
 
-		echo '<table class="widefat striped">';
-		echo '<thead><tr><th>Pedido</th><th>Factura / referencia</th><th>Estado</th><th>Cliente</th><th></th></tr></thead><tbody>';
+		echo '<div class="asdl-wcl-search-results">';
 
 		foreach ( $results as $row ) {
 			$url = add_query_arg(
@@ -145,56 +158,86 @@ final class RevertInventoryPage {
 				admin_url( 'admin.php' )
 			);
 
-			echo '<tr>';
-			echo '<td><strong>#' . esc_html( $row['order_number'] ) . '</strong><br /><small>ID ' . esc_html( $row['order_id'] ) . '</small></td>';
-			echo '<td>' . esc_html( $row['invoice_number'] ?: '—' ) . '</td>';
-			echo '<td>' . esc_html( $row['status'] ) . '</td>';
-			echo '<td>' . esc_html( $row['customer'] ?: '—' ) . '</td>';
-			echo '<td><a class="button" href="' . esc_url( $url ) . '">Ver preview</a></td>';
-			echo '</tr>';
+			echo '<div class="asdl-wcl-search-result">';
+			echo '<div class="asdl-wcl-search-result-header">';
+			echo '<div>';
+			echo '<strong>#' . esc_html( $row['order_number'] ) . '</strong><br /><span class="asdl-wcl-meta">ID ' . esc_html( $row['order_id'] ) . '</span>';
+			echo '</div>';
+			echo '<div class="asdl-wcl-inline-badges">';
+			echo $this->badge( (string) $row['status'], $this->status_tone( (string) $row['status'] ) );
+			if ( ! empty( $row['invoice_number'] ) ) {
+				echo $this->badge( 'Factura ' . (string) $row['invoice_number'], 'neutral' );
+			}
+			echo '</div>';
+			echo '</div>';
+			echo '<div class="asdl-wcl-data-grid">';
+			echo '<div class="asdl-wcl-data-cell"><span>Cliente</span>' . esc_html( (string) ( $row['customer'] ?: '—' ) ) . '</div>';
+			echo '<div class="asdl-wcl-data-cell"><span>Editar pedido</span>' . ( ! empty( $row['edit_url'] ) ? '<a href="' . esc_url( $row['edit_url'] ) . '">Abrir en WooCommerce</a>' : '—' ) . '</div>';
+			echo '<div class="asdl-wcl-data-cell"><span>Acción</span><a class="button" href="' . esc_url( $url ) . '">Ver preview</a></div>';
+			echo '</div>';
+			echo '</div>';
 		}
 
-		echo '</tbody></table>';
+		echo '</div>';
 	}
 
 	private function render_preview( array $preview, $query ) {
-		echo '<hr style="margin:24px 0;" />';
-		echo '<h2>Preview de reversión</h2>';
-		echo '<table class="form-table" role="presentation">';
-		echo '<tbody>';
-		echo '<tr><th scope="row">Pedido</th><td>#' . esc_html( (string) ( $preview['order_number'] ?? '' ) ) . ' (ID ' . esc_html( (string) ( $preview['order_id'] ?? 0 ) ) . ')</td></tr>';
-		echo '<tr><th scope="row">Factura / referencia</th><td>' . esc_html( (string) ( $preview['invoice_number'] ?? '—' ) ) . '</td></tr>';
-		echo '<tr><th scope="row">Cliente</th><td>' . esc_html( (string) ( $preview['customer_label'] ?? '—' ) ) . '</td></tr>';
-		echo '<tr><th scope="row">Estado</th><td>' . esc_html( (string) ( $preview['status'] ?? '' ) ) . '</td></tr>';
-		echo '<tr><th scope="row">Flag stock reducido</th><td>' . ( ! empty( $preview['order_stock_reduced'] ) ? 'Sí' : 'No' ) . '</td></tr>';
-		echo '<tr><th scope="row">Notas compatibles</th><td>' . esc_html( (string) count( (array) ( $preview['matched_notes'] ?? array() ) ) ) . '</td></tr>';
-		echo '</tbody>';
-		echo '</table>';
-
-		if ( ! empty( $preview['blocking_reasons'] ) ) {
-			echo '<div class="notice notice-error"><p><strong>Bloqueado:</strong> ' . esc_html( implode( ' ', (array) $preview['blocking_reasons'] ) ) . '</p></div>';
-		} else {
-			echo '<div class="notice notice-success"><p>El pedido es elegible para reversión arbitraria segura.</p></div>';
+		echo '<div class="asdl-wcl-order-overview">';
+		echo '<div class="asdl-wcl-order-overview-header">';
+		echo '<div><h2 style="margin:0;">Preview de reversión</h2><span class="asdl-wcl-meta">Pedido #' . esc_html( (string) ( $preview['order_number'] ?? '' ) ) . ' · ID ' . esc_html( (string) ( $preview['order_id'] ?? 0 ) ) . '</span></div>';
+		echo '<div class="asdl-wcl-inline-badges">';
+		echo $this->badge( (string) ( $preview['status'] ?? '' ), $this->status_tone( (string) ( $preview['status'] ?? '' ) ) );
+		echo $this->badge( ! empty( $preview['eligible'] ) ? 'Elegible' : 'Bloqueado', ! empty( $preview['eligible'] ) ? 'success' : 'danger' );
+		if ( ! empty( $preview['partial_reverted'] ) ) {
+			echo $this->badge( 'Reversión parcial previa', 'warning' );
 		}
+		if ( ! empty( $preview['already_reverted'] ) ) {
+			echo $this->badge( 'Ya revertido', 'danger' );
+		}
+		echo '</div>';
+		echo '</div>';
+		echo '<div class="asdl-wcl-data-grid">';
+		echo '<div class="asdl-wcl-data-cell"><span>Factura / referencia</span>' . esc_html( (string) ( $preview['invoice_number'] ?? '—' ) ) . '</div>';
+		echo '<div class="asdl-wcl-data-cell"><span>Cliente</span>' . esc_html( (string) ( $preview['customer_label'] ?? '—' ) ) . '</div>';
+		echo '<div class="asdl-wcl-data-cell"><span>Flag stock reducido</span>' . ( ! empty( $preview['order_stock_reduced'] ) ? 'Sí' : 'No' ) . '</div>';
+		echo '<div class="asdl-wcl-data-cell"><span>Notas compatibles</span>' . esc_html( (string) count( (array) ( $preview['matched_notes'] ?? array() ) ) ) . '</div>';
+		echo '<div class="asdl-wcl-data-cell"><span>Restaurables</span>' . esc_html( (string) count( (array) ( $preview['restorable_items'] ?? array() ) ) ) . '</div>';
+		echo '<div class="asdl-wcl-data-cell"><span>Omitidos / bloqueados</span>' . esc_html( (string) count( (array) ( $preview['skipped_items'] ?? array() ) ) ) . '</div>';
+		echo '</div>';
+		echo '</div>';
 
+		echo '<div class="asdl-wcl-grid">';
+		echo '<div class="asdl-wcl-panel">';
+		echo '<h2>Evidencias detectadas</h2>';
+		echo '<ul class="asdl-wcl-list">';
+		echo '<li>Notas compatibles: ' . esc_html( ! empty( $preview['note_evidence']['has_matching_note'] ) ? 'sí' : 'no' ) . ' (' . esc_html( (string) absint( $preview['note_evidence']['count'] ?? 0 ) ) . ')</li>';
+		echo '<li>_reduced_stock positivo en líneas: ' . esc_html( ! empty( $preview['line_evidence']['has_reduced_item_meta'] ) ? 'sí' : 'no' ) . '</li>';
+		echo '<li>Ítems restaurables: ' . esc_html( (string) absint( $preview['line_evidence']['restorable_count'] ?? 0 ) ) . '</li>';
+		echo '<li>Flag de pedido stock reducido: ' . esc_html( ! empty( $preview['order_flag_evidence']['stock_reduced'] ) ? 'sí' : 'no' ) . '</li>';
 		if ( ! empty( $preview['matched_notes'] ) ) {
-			echo '<p><strong>Notas coincidentes:</strong> ';
-			echo esc_html( implode( ' | ', wp_list_pluck( (array) $preview['matched_notes'], 'content' ) ) );
-			echo '</p>';
+			echo '<li>Notas: ' . esc_html( implode( ' | ', wp_list_pluck( (array) $preview['matched_notes'], 'content' ) ) ) . '</li>';
 		}
+		echo '</ul>';
+		echo '</div>';
 
-		echo '<table class="widefat striped">';
-		echo '<thead><tr><th>Ítem</th><th>SKU</th><th>Cantidad pedido</th><th>Cantidad reducida</th><th>Estado</th></tr></thead><tbody>';
-		foreach ( (array) ( $preview['items'] ?? array() ) as $item ) {
-			echo '<tr>';
-			echo '<td>' . esc_html( (string) ( $item['name'] ?? '' ) ) . '</td>';
-			echo '<td>' . esc_html( (string) ( $item['sku'] ?? '—' ) ) . '</td>';
-			echo '<td>' . esc_html( (string) ( $item['ordered_qty'] ?? 0 ) ) . '</td>';
-			echo '<td>' . esc_html( (string) ( $item['reduced_stock_qty'] ?? 0 ) ) . '</td>';
-			echo '<td>' . esc_html( ! empty( $item['can_restore'] ) ? 'Restaurable' : ( $item['skip_reason'] ?: 'Omitido' ) ) . '</td>';
-			echo '</tr>';
+		echo '<div class="asdl-wcl-panel">';
+		echo '<h2>Motivos de bloqueo</h2>';
+		if ( ! empty( $preview['blocking_reasons'] ) ) {
+			echo '<ul class="asdl-wcl-list">';
+			foreach ( (array) $preview['blocking_reasons'] as $reason ) {
+				echo '<li>' . esc_html( (string) $reason ) . '</li>';
+			}
+			echo '</ul>';
+		} else {
+			echo '<p>No se detectaron bloqueos. El pedido es elegible para reversión arbitraria segura.</p>';
 		}
-		echo '</tbody></table>';
+		echo '</div>';
+		echo '</div>';
+
+		$this->render_items_table( 'Ítems restaurables', (array) ( $preview['restorable_items'] ?? array() ) );
+		if ( ! empty( $preview['skipped_items'] ) ) {
+			$this->render_items_table( 'Ítems omitidos / no restaurables', (array) $preview['skipped_items'] );
+		}
 
 		if ( ! empty( $preview['eligible'] ) ) {
 			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="margin-top:16px;">';
@@ -205,6 +248,27 @@ final class RevertInventoryPage {
 			submit_button( 'Ejecutar reversión segura', 'primary', 'submit', false, array( 'onclick' => "return confirm('Esta acción restaurará el stock registrado para este pedido y no podrá ejecutarse dos veces. ¿Continuar?');" ) );
 			echo '</form>';
 		}
+	}
+
+	private function render_items_table( $title, array $items ) {
+		echo '<div class="asdl-wcl-panel">';
+		echo '<h2>' . esc_html( (string) $title ) . '</h2>';
+		echo '<div class="asdl-wcl-table-wrap">';
+		echo '<table class="widefat striped asdl-wcl-preview-table">';
+		echo '<thead><tr><th>Ítem</th><th>SKU</th><th>Pedido</th><th>Reducido</th><th>Stock actual</th><th>Estado</th></tr></thead><tbody>';
+		foreach ( $items as $item ) {
+			echo '<tr>';
+			echo '<td>' . esc_html( (string) ( $item['name'] ?? '' ) ) . '</td>';
+			echo '<td>' . esc_html( (string) ( $item['sku'] ?? '—' ) ) . '</td>';
+			echo '<td>' . esc_html( (string) ( $item['ordered_qty'] ?? 0 ) ) . '</td>';
+			echo '<td>' . esc_html( (string) ( $item['reduced_stock_qty'] ?? 0 ) ) . '</td>';
+			echo '<td>' . esc_html( isset( $item['current_stock_qty'] ) && null !== $item['current_stock_qty'] ? (string) $item['current_stock_qty'] : '—' ) . '</td>';
+			echo '<td>' . ( ! empty( $item['can_restore'] ) ? $this->badge( 'Restaurable', 'success' ) : $this->badge( (string) ( $item['skip_reason'] ?: 'Omitido' ), 'warning' ) ) . '</td>';
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
+		echo '</div>';
+		echo '</div>';
 	}
 
 	private function redirect_with_notice( $type, $message, $order_id = 0, $query = '' ) {
@@ -224,5 +288,27 @@ final class RevertInventoryPage {
 
 		wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
 		exit;
+	}
+
+	private function badge( $label, $tone ) {
+		return '<span class="asdl-wcl-badge asdl-wcl-badge-' . esc_attr( sanitize_html_class( (string) $tone ) ) . '">' . esc_html( (string) $label ) . '</span>';
+	}
+
+	private function status_tone( $status ) {
+		$status = sanitize_key( (string) $status );
+
+		if ( in_array( $status, array( 'completed', 'processing', 'on-hold' ), true ) ) {
+			return 'success';
+		}
+
+		if ( in_array( $status, array( 'pending', 'draft' ), true ) ) {
+			return 'warning';
+		}
+
+		if ( in_array( $status, array( 'cancelled', 'failed', 'refunded', 'trash' ), true ) ) {
+			return 'danger';
+		}
+
+		return 'neutral';
 	}
 }

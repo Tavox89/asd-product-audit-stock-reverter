@@ -33,12 +33,16 @@ final class ChangeLogPage {
 		$list_table->prepare_items();
 		$users = $this->repository->get_distinct_users();
 
-		echo '<div class="wrap">';
-		echo '<h1>TVX Woo Change Log</h1>';
-		echo '<p>Audit log de cambios de stock, regular price y costo YITH cuando exista una meta verificada en runtime.</p>';
+		echo '<div class="wrap asdl-wcl-admin">';
+		echo '<h1>ASD Labs Product Audit Log</h1>';
+		echo '<p>Auditoría canónica de stock, regular price, costo YITH cuando exista una meta válida y eventos de reversión arbitraria. La tabla visible siempre sale de la base ASD Labs.</p>';
 
 		if ( ! $this->cost_meta_resolver->is_available() ) {
 			echo '<div class="notice notice-info"><p>' . esc_html( $this->cost_meta_resolver->get_status_label() ) . '</p></div>';
+		}
+
+		if ( current_user_can( CapabilityManager::MANAGE_CONFIGURATION ) ) {
+			echo '<p><a class="button button-secondary" href="' . esc_url( admin_url( 'admin.php?page=' . StockManagerCompatPage::SLUG ) ) . '">Ver compatibilidad Stock Manager</a></p>';
 		}
 
 		echo '<form method="get">';

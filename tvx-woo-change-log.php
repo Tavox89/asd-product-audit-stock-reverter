@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: TVX Woo Change Log & Safe Inventory Reverter
+ * Plugin Name: ASD Labs Product Audit & Stock Reverter
  * Plugin URI: https://asdlabs.com.ve
- * Description: Audit log de cambios de productos y reversión arbitraria y segura de inventario por pedido para WooCommerce.
- * Version: 1.0.0
+ * Description: Auditoría enriquecida de productos WooCommerce, compatibilidad con Stock Manager y reversión arbitraria segura de inventario por pedido.
+ * Version: 1.1.0
  * Author: ASD Labs
  * Author URI: https://asdlabs.com.ve
  * Text Domain: tvx-woo-change-log
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'TVX_WCL_VERSION' ) ) {
-	define( 'TVX_WCL_VERSION', '1.0.0' );
+	define( 'TVX_WCL_VERSION', '1.1.0' );
 }
 
 if ( ! defined( 'TVX_WCL_FILE' ) ) {

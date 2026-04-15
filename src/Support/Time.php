@@ -45,4 +45,32 @@ final class Time {
 
 		return $datetime->setTimezone( $utc )->format( 'Y-m-d H:i:s' );
 	}
+
+	public static function site_datetime_to_utc( $datetime_string ) {
+		$datetime_string = sanitize_text_field( (string) $datetime_string );
+		if ( '' === $datetime_string ) {
+			return '';
+		}
+
+		$timezone = wp_timezone();
+		$utc      = new DateTimeZone( 'UTC' );
+		$formats  = array(
+			'Y-m-d H:i:s',
+			'Y-m-d H:i',
+		);
+
+		foreach ( $formats as $format ) {
+			$datetime = DateTimeImmutable::createFromFormat( $format, $datetime_string, $timezone );
+			if ( $datetime ) {
+				return $datetime->setTimezone( $utc )->format( 'Y-m-d H:i:s' );
+			}
+		}
+
+		$timestamp = strtotime( $datetime_string );
+		if ( ! $timestamp ) {
+			return '';
+		}
+
+		return gmdate( 'Y-m-d H:i:s', $timestamp );
+	}
 }

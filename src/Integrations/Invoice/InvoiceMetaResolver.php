@@ -4,7 +4,7 @@ namespace ASDLabs\TVXWooChangeLog\Integrations\Invoice;
 
 final class InvoiceMetaResolver {
 	public function get_search_meta_keys() {
-		return array(
+		$keys = array(
 			'_invoice_number',
 			'_order_number',
 			'_order_number_formatted',
@@ -19,6 +19,10 @@ final class InvoiceMetaResolver {
 			'_wpos_order_number',
 			'_billing_document',
 		);
+
+		$keys = apply_filters( 'tvx_wcl_invoice_meta_keys', $keys );
+
+		return array_values( array_unique( array_filter( array_map( 'sanitize_key', (array) $keys ) ) ) );
 	}
 
 	public function resolve_invoice_number( $order ) {
@@ -38,10 +42,27 @@ final class InvoiceMetaResolver {
 
 	public function get_detected_strategy_notes() {
 		return array(
-			'Integración local detectada con secuenciales OpenPOS/Woo por _order_number y _order_number_formatted.',
-			'Integración local detectada con OpenPOS por _op_order_number, _op_order_number_format, _op_wc_custom_order_number y variantes.',
-			'Referencia local adicional a _invoice_number y aliases operativos desde OP Guard.',
-			'No se encontró una meta específica de número de factura expuesta por WPO/WCPDF en este árbol local.',
+			'Búsqueda prioriza order ID y order number nativo de WooCommerce.',
+			'Metas locales observadas para OpenPOS y secuenciales operativos: _order_number, _order_number_formatted, _op_order_number y variantes.',
+			'Alias adicionales detectados localmente: _invoice_number, _pos_order_no, _op_receipt_number, _billing_document.',
+			'No se verificó una integración WPO/WCPDF específica en este árbol; la estrategia queda basada en metas observadas localmente.',
 		);
+	}
+
+	public function resolve_order_edit_url( $order ) {
+		if ( ! $order || ! is_object( $order ) ) {
+			return '';
+		}
+
+		if ( method_exists( $order, 'get_edit_order_url' ) ) {
+			return (string) $order->get_edit_order_url();
+		}
+
+		$order_id = method_exists( $order, 'get_id' ) ? (int) $order->get_id() : 0;
+		if ( $order_id <= 0 ) {
+			return '';
+		}
+
+		return admin_url( 'post.php?post=' . $order_id . '&action=edit' );
 	}
 }
